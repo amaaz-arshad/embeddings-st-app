@@ -1,60 +1,41 @@
-import fastapi
-import logging
-import requests
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from dotenv import load_dotenv
-import os
+from sentence_transformers import SentenceTransformer
+import logging
 
-load_dotenv() 
+# Initialize FastAPI app
+app = FastAPI()
 
-# Create FastAPI instance
-app = fastapi.FastAPI()
+# Load the SentenceTransformer model once at startup
+model = SentenceTransformer("sentence-transformers/multi-qa-mpnet-base-dot-v1")
 
-# Hugging Face API token and model details
-hf_token = os.getenv("HF_TOKEN")  # Replace with your token
-model_id = "sentence-transformers/multi-qa-mpnet-base-dot-v1"  # Replace with your model
-
-# Define the Hugging Face API endpoint
-api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_id}"
-headers = {'Authorization': f'Bearer {hf_token}'}
-
-# Define a Pydantic model for the request body
-class InputText(BaseModel):
+# Define the request body structure
+class TextRequest(BaseModel):
     input: str
 
 @app.post("/embed")
-async def embed(request: InputText):
+async def embed(request: TextRequest):
     logging.info("FastAPI endpoint for text embedding has been called.")
-
-    # Extract the text from the request body
+    
     text = request.input
 
     if not text:
-        return fastapi.HTTPException(status_code=400, detail="Error: 'input' field missing or empty in JSON body.")
+        raise HTTPException(status_code=400, detail="Error: 'input' field is empty.")
 
-    # Prepare the payload for the Hugging Face API using the provided text
-    payload = {"inputs": text}
-
-    # Make the API request to Hugging Face
     try:
-        response = requests.post(api_url, headers=headers, json=payload)
-        response.raise_for_status()  # Raise an exception for 4xx/5xx status codes
-        result = response.json()  # Parse the response JSON
-    except requests.exceptions.RequestException as e:
-        return fastapi.HTTPException(status_code=500, detail=f"Error calling Hugging Face API: {str(e)}")
+        # Generate embedding using the SentenceTransformer model
+        embedding = model.encode(text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating embedding: {str(e)}")
 
-    # If the result is a list with one element, assume it is the vector array
-    if isinstance(result, list) and len(result) == 1:
-        vector = result[0]
-    else:
-        vector = result
+    # Convert the embedding (likely a numpy array) to a list for JSON serialization
+    embedding_list = embedding.tolist() if hasattr(embedding, "tolist") else embedding
 
-    # Wrap the vector in the desired format
+    # Wrap the vector in the desired JSON format
     response_data = {
         "data": [
-            {"embedding": vector}
+            {"embedding": embedding_list}
         ]
     }
 
-    # Return the embedding result directly as a JSON array (vector array format)
     return response_data
