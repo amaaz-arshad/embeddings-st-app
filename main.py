@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 import logging
-import json
 
 # Initialize FastAPI app
 app = FastAPI()
