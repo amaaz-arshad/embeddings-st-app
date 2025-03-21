@@ -34,7 +34,9 @@ async def embed(request: TextRequest):
     # Wrap the vector in the desired JSON format
     response_data = {
         "data": [
-            {"embedding": embedding_list}
+            {
+                "embedding": embedding_list
+            }
         ]
     }
 
